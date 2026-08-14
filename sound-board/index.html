@@ -87,7 +87,6 @@
 
 <label for="channel-select">Listen on MIDI Channel:</label>
 <select id="channel-select">
-  <option value="9">Channel 10 (MPK Pads)</option>
   <option value="0">Channel 1 (Keys)</option>
 </select>
 
@@ -177,7 +176,7 @@
     noteInput.type = "number";
     noteInput.min = 0;
     noteInput.max = 127;
-    noteInput.value = 60 + index; // default notes
+    noteInput.value = 48 + index; // default notes
     noteInput.className = "note-input";
 
     const audio = new Audio(file);
