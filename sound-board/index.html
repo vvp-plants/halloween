@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MPK Mini Soundboard (Built-In Sounds)</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: #111;
+    color: #eee;
+    text-align: center;
+    padding: 20px;
+  }
+
+  #status {
+    margin-bottom: 10px;
+    color: #ccc;
+  }
+
+  #channel-select {
+    margin: 10px;
+    padding: 8px;
+    font-size: 16px;
+  }
+
+  .pad-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 15px;
+    margin-top: 20px;
+  }
+
+  .pad {
+    background: #333;
+    padding: 15px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: transform 0.15s, background 0.15s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .pad.active {
+    background: #ff9800;
+    transform: scale(1.08);
+  }
+
+  .pad::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(255, 152, 0, 0.4);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .pad.pulse::after {
+    animation: pulse 0.5s ease-out;
+  }
+
+  @keyframes pulse {
+    0% { width: 0; height: 0; opacity: 0.7; }
+    100% { width: 200px; height: 200px; opacity: 0; }
+  }
+
+  .note-input {
+    margin-top: 10px;
+    width: 60px;
+    padding: 5px;
+    font-size: 14px;
+    text-align: center;
+    border-radius: 6px;
+    border: none;
+  }
+</style>
+</head>
+<body>
+
+<h1>MPK Mini Soundboard</h1>
+
+<div id="status">Connecting to MIDI…</div>
+
+<label for="channel-select">Listen on MIDI Channel:</label>
+<select id="channel-select">
+  <option value="9">Channel 10 (MPK Pads)</option>
+  <option value="0">Channel 1 (Keys)</option>
+</select>
+
+<div class="pad-grid" id="pads"></div>
+
+<script>
+  let midiAccess = null;
+  let midiInput = null;
+
+  const channelSelect = document.getElementById("channel-select");
+  const pads = document.getElementById("pads");
+
+  let padData = [];
+
+  // Your built-in sounds
+  const soundFiles = [
+    "sounds/kick.wav",
+    "sounds/snare.wav",
+    "sounds/hat.wav",
+    "sounds/bass.wav",
+    "sounds/fx1.wav",
+    "sounds/fx2.wav",
+    "sounds/pad1.wav",
+    "sounds/pad2.wav"
+  ];
+
+  // MIDI INIT
+  if (navigator.requestMIDIAccess) {
+    navigator.requestMIDIAccess().then(onMIDISuccess, onMIDIFailure);
+  } else {
+    document.getElementById("status").textContent =
+      "Web MIDI not supported in this browser.";
+  }
+
+  function onMIDISuccess(access) {
+    midiAccess = access;
+    const inputs = Array.from(access.inputs.values());
+    if (inputs.length > 0) {
+      midiInput = inputs[0];
+      midiInput.onmidimessage = onMIDIMessage;
+      document.getElementById("status").textContent =
+        "Listening to MIDI input: " + midiInput.name;
+    } else {
+      document.getElementById("status").textContent =
+        "No MIDI input found.";
+    }
+  }
+
+  function onMIDIFailure() {
+    document.getElementById("status").textContent =
+      "Failed to access MIDI.";
+  }
+
+  function onMIDIMessage(msg) {
+    const [status, note, velocity] = msg.data;
+    const channel = status & 0x0F;
+    const type = status & 0xF0;
+
+    const selectedChannel = parseInt(channelSelect.value);
+
+    if (channel === selectedChannel && type === 0x90 && velocity > 0) {
+      triggerPadByNote(note);
+    }
+  }
+
+  function triggerPadByNote(note) {
+    const padObj = padData.find(p => p.midiNote === note);
+    if (!padObj) return;
+
+    const { audio, element } = padObj;
+
+    audio.currentTime = 0;
+    audio.play();
+
+    element.classList.add("active", "pulse");
+    setTimeout(() => element.classList.remove("active"), 150);
+    setTimeout(() => element.classList.remove("pulse"), 500);
+  }
+
+  // Build pads from built-in sounds
+  soundFiles.forEach((file, index) => {
+    const pad = document.createElement("div");
+    pad.className = "pad";
+
+    const label = document.createElement("div");
+    label.textContent = file.split("/").pop();
+
+    const noteInput = document.createElement("input");
+    noteInput.type = "number";
+    noteInput.min = 0;
+    noteInput.max = 127;
+    noteInput.value = 60 + index; // default notes
+    noteInput.className = "note-input";
+
+    const audio = new Audio(file);
+
+    pad.appendChild(label);
+    pad.appendChild(noteInput);
+
+    pad.addEventListener("click", () => {
+      triggerPadByNote(parseInt(noteInput.value));
+    });
+
+    pads.appendChild(pad);
+
+    padData.push({
+      midiNote: parseInt(noteInput.value),
+      audio,
+      element: pad,
+      input: noteInput
+    });
+
+    noteInput.addEventListener("change", () => {
+      padData[index].midiNote = parseInt(noteInput.value);
+    });
+  });
+</script>
+
+</body>
+</html>
